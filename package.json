@@ -1,0 +1,65 @@
+{
+  "name": "snoremd-backend",
+  "version": "1.0.0",
+  "description": "SnoreMD Medical Notes API Backend",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "sam:build": "cd infra && sam build",
+    "dev": "cd infra && sam local start-api --docker-network snoremd-network --env-vars ../sam-env.json",
+    "start": "npm run build && npm run sam:build && npm run dev",
+    "dev:docker": "docker-compose -f docker/docker-compose.yml up -d",
+    "dev:docker:stop": "docker-compose -f docker/docker-compose.yml down",
+    "dev:docker:init": "node docker/init-local-db.js",
+    "test": "jest --testPathPattern=unit",
+    "test:integration": "jest --testPathPattern=integration --runInBand",
+    "test:all": "jest --runInBand",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write 'src/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.ts'",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist",
+    "prebuild": "npm run clean"
+  },
+  "keywords": [
+    "healthcare",
+    "notes",
+    "aws",
+    "serverless",
+    "lambda"
+  ],
+  "author": "",
+  "license": "PRIVATE",
+  "devDependencies": {
+    "@aws-sdk/client-apigatewayv2": "^3.978.0",
+    "@types/aws-lambda": "^8.10.145",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.17.12",
+    "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "esbuild": "^0.24.2",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.2.2",
+    "jest": "^29.7.0",
+    "prettier": "^3.4.2",
+    "rimraf": "^6.0.1",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.712.0",
+    "@aws-sdk/client-dynamodb": "^3.712.0",
+    "@aws-sdk/client-s3": "^3.712.0",
+    "@aws-sdk/lib-dynamodb": "^3.712.0",
+    "@aws-sdk/s3-request-presigner": "^3.712.0",
+    "uuid": "^11.0.3",
+    "zod": "^3.24.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

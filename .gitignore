@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.aws-sam/
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.*.local
+sam-env.json
+
+# SAM deployment config (contains account-specific values)
+samconfig.toml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Temporary files
+tmp/
+temp/

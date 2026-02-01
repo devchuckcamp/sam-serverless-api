@@ -1,0 +1,104 @@
+{
+  "_comment": [
+    "=============================================================================",
+    "SAM Local Environment Variables",
+    "=============================================================================",
+    "Copy this file to sam-env.json and replace placeholder values.",
+    "",
+    "PLACEHOLDER GUIDE:",
+    "  <YOUR-REGION>           -> AWS region (e.g., us-east-1, ca-central-1)",
+    "  <YOUR_USER_POOL_ID>     -> Cognito User Pool ID (e.g., us-east-1_AbCdEfGh)",
+    "  <YOUR_CLIENT_ID>        -> Cognito App Client ID",
+    "  <YOUR_CLIENT_SECRET>    -> Cognito App Client Secret (use AWS CLI to get)",
+    "",
+    "HOW TO GET COGNITO VALUES:",
+    "  # 1. List user pools",
+    "  aws cognito-idp list-user-pools --max-results 10",
+    "",
+    "  # 2. List app clients (replace YOUR_USER_POOL_ID)",
+    "  aws cognito-idp list-user-pool-clients --user-pool-id YOUR_USER_POOL_ID",
+    "",
+    "  # 3. Get client secret (replace both placeholders)",
+    "  aws cognito-idp describe-user-pool-client \\",
+    "    --user-pool-id YOUR_USER_POOL_ID \\",
+    "    --client-id YOUR_CLIENT_ID \\",
+    "    --query \"UserPoolClient.ClientSecret\" \\",
+    "    --output text",
+    "",
+    "NOTE: DYNAMODB_ENDPOINT uses 'host.docker.internal' because SAM runs",
+    "      Lambda functions inside Docker containers.",
+    "============================================================================="
+  ],
+  "CreateNoteFunction": {
+    "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-dev",
+    "AWS_REGION": "us-east-1"
+  },
+  "ListNotesFunction": {
+    "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-dev",
+    "AWS_REGION": "us-east-1"
+  },
+  "ListPatientsFunction": {
+    "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-dev",
+    "AWS_REGION": "us-east-1"
+  },
+  "GetClinicFunction": {
+    "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-dev",
+    "AWS_REGION": "us-east-1"
+  },
+  "GetNoteFunction": {
+    "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-dev",
+    "AWS_REGION": "us-east-1"
+  },
+  "UpdateNoteFunction": {
+    "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-dev",
+    "AWS_REGION": "us-east-1"
+  },
+  "DeleteNoteFunction": {
+    "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-dev",
+    "AWS_REGION": "us-east-1"
+  },
+  "PresignUploadFunction": {
+    "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-dev",
+    "AWS_REGION": "us-east-1"
+  },
+  "PresignDownloadFunction": {
+    "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-dev",
+    "AWS_REGION": "us-east-1"
+  },
+  "LoginFunction": {
+    "_comment": "Replace placeholder values below with your Cognito credentials",
+    "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "COGNITO_USER_POOL_ID": "<YOUR_USER_POOL_ID>",
+    "COGNITO_CLIENT_ID": "<YOUR_CLIENT_ID>",
+    "COGNITO_CLIENT_SECRET": "<YOUR_CLIENT_SECRET>",
+    "AWS_REGION": "us-east-1"
+  },
+  "RefreshTokenFunction": {
+    "_comment": "Replace placeholder values below with your Cognito credentials",
+    "DYNAMODB_ENDPOINT": "http://host.docker.internal:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "COGNITO_USER_POOL_ID": "<YOUR_USER_POOL_ID>",
+    "COGNITO_CLIENT_ID": "<YOUR_CLIENT_ID>",
+    "COGNITO_CLIENT_SECRET": "<YOUR_CLIENT_SECRET>",
+    "AWS_REGION": "us-east-1"
+  }
+}
