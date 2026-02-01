@@ -1,0 +1,54 @@
+{
+  "CreateNoteFunction": {
+    "IS_LOCAL": "true",
+    "DYNAMODB_ENDPOINT": "http://snoremd-dynamodb:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-local",
+    "AWS_REGION": "us-east-1",
+    "LOG_LEVEL": "DEBUG"
+  },
+  "ListNotesFunction": {
+    "IS_LOCAL": "true",
+    "DYNAMODB_ENDPOINT": "http://snoremd-dynamodb:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-local",
+    "AWS_REGION": "us-east-1",
+    "LOG_LEVEL": "DEBUG"
+  },
+  "GetNoteFunction": {
+    "IS_LOCAL": "true",
+    "DYNAMODB_ENDPOINT": "http://snoremd-dynamodb:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-local",
+    "AWS_REGION": "us-east-1",
+    "LOG_LEVEL": "DEBUG"
+  },
+  "UpdateNoteFunction": {
+    "IS_LOCAL": "true",
+    "DYNAMODB_ENDPOINT": "http://snoremd-dynamodb:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-local",
+    "AWS_REGION": "us-east-1",
+    "LOG_LEVEL": "DEBUG"
+  },
+  "DeleteNoteFunction": {
+    "IS_LOCAL": "true",
+    "DYNAMODB_ENDPOINT": "http://snoremd-dynamodb:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-local",
+    "AWS_REGION": "us-east-1",
+    "LOG_LEVEL": "DEBUG"
+  },
+  "PresignUploadFunction": {
+    "IS_LOCAL": "true",
+    "DYNAMODB_ENDPOINT": "http://snoremd-dynamodb:8000",
+    "TABLE_NAME": "SnoreMDNotes-dev",
+    "ATTACHMENTS_BUCKET": "snoremd-attachments-local",
+    "AWS_REGION": "us-east-1",
+    "LOG_LEVEL": "DEBUG"
+  },
+  "AuthFunction": {
+    "IS_LOCAL": "true",
+    "LOG_LEVEL": "DEBUG"
+  }
+}

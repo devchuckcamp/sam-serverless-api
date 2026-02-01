@@ -1,0 +1,624 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SnoreMD Medical Notes API - Multi-tenant healthcare notes management
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 30
+    MemorySize: 256
+    Tracing: Active
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref NotesTable
+        ATTACHMENTS_BUCKET: !Ref AttachmentsBucket
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+        LOG_LEVEL: INFO
+        DYNAMODB_ENDPOINT: ''
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Deployment environment
+
+  CognitoUserPoolArn:
+    Type: String
+    Description: ARN of the Cognito User Pool for JWT authorization
+
+  CognitoUserPoolId:
+    Type: String
+    Description: Cognito User Pool ID (e.g., us-east-1_XXXXXXXXX)
+
+  CognitoClientId:
+    Type: String
+    Description: Cognito App Client ID
+
+  CognitoClientSecret:
+    Type: String
+    NoEcho: true
+    Description: Cognito App Client Secret (keep confidential)
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, prod]
+
+Resources:
+  # KMS Key for encryption
+  EncryptionKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: KMS key for SnoreMD data encryption
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: Allow Lambda Functions
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - kms:Decrypt
+              - kms:GenerateDataKey
+            Resource: '*'
+            Condition:
+              StringEquals:
+                kms:CallerAccount: !Ref AWS::AccountId
+
+  EncryptionKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/snoremd-${Environment}'
+      TargetKeyId: !Ref EncryptionKey
+
+  # DynamoDB Table - Single Table Design
+  NotesTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: !If [IsProd, Retain, Delete]
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub 'SnoreMDNotes-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref EncryptionKey
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !If [IsProd, true, false]
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: SnoreMD
+
+  # S3 Bucket for Attachments
+  AttachmentsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: !If [IsProd, Retain, Delete]
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub 'snoremd-attachments-${AWS::AccountId}-${Environment}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref EncryptionKey
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteIncompleteMultipartUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - PUT
+              - GET
+            AllowedOrigins:
+              - '*'
+            MaxAge: 3600
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: SnoreMD
+
+  AttachmentsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AttachmentsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: EnforceTLS
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt AttachmentsBucket.Arn
+              - !Sub '${AttachmentsBucket.Arn}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': false
+
+  # HTTP API with JWT Authorizer
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 100
+        ThrottlingRateLimit: 50
+      RouteSettings:
+        "POST /auth/login":
+          ThrottlingBurstLimit: 10
+          ThrottlingRateLimit: 5
+        "POST /patients/{patientId}/notes":
+          ThrottlingBurstLimit: 50
+          ThrottlingRateLimit: 25
+        "POST /patients/{patientId}/notes/{noteId}/attachments/presign":
+          ThrottlingBurstLimit: 20
+          ThrottlingRateLimit: 10
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowHeaders:
+          - Authorization
+          - Content-Type
+          - X-Correlation-Id
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        MaxAge: 3600
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            AuthorizationScopes: []
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPoolId}'
+              audience:
+                - !Ref CognitoClientId
+      Tags:
+        Environment: !Ref Environment
+        Application: SnoreMD
+
+  # Lambda Functions
+  CreateNoteFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/createNote.ts
+    Properties:
+      CodeUri: ..
+      Handler: createNote.handler
+      Description: Create a new medical note
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotesTable
+        - KMSDecryptPolicy:
+            KeyId: !Ref EncryptionKey
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /patients/{patientId}/notes
+            Method: POST
+      Tags:
+        Environment: !Ref Environment
+        Application: SnoreMD
+
+  ListNotesFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/listNotes.ts
+    Properties:
+      CodeUri: ..
+      Handler: listNotes.handler
+      Description: List medical notes with pagination
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref NotesTable
+        - KMSDecryptPolicy:
+            KeyId: !Ref EncryptionKey
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /patients/{patientId}/notes
+            Method: GET
+      Tags:
+        Environment: !Ref Environment
+        Application: SnoreMD
+
+  ListPatientsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/listPatients.ts
+    Properties:
+      CodeUri: ..
+      Handler: listPatients.handler
+      Description: List patients for the authenticated clinic
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref NotesTable
+        - KMSDecryptPolicy:
+            KeyId: !Ref EncryptionKey
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /patients
+            Method: GET
+      Tags:
+        Environment: !Ref Environment
+        Application: SnoreMD
+
+  GetClinicFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/getClinic.ts
+    Properties:
+      CodeUri: ..
+      Handler: getClinic.handler
+      Description: Get clinic information for the authenticated user
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref NotesTable
+        - KMSDecryptPolicy:
+            KeyId: !Ref EncryptionKey
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /clinic
+            Method: GET
+      Tags:
+        Environment: !Ref Environment
+        Application: SnoreMD
+
+  GetNoteFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/getNote.ts
+    Properties:
+      CodeUri: ..
+      Handler: getNote.handler
+      Description: Get a single medical note
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref NotesTable
+        - KMSDecryptPolicy:
+            KeyId: !Ref EncryptionKey
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /patients/{patientId}/notes/{noteId}
+            Method: GET
+      Tags:
+        Environment: !Ref Environment
+        Application: SnoreMD
+
+  UpdateNoteFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/updateNote.ts
+    Properties:
+      CodeUri: ..
+      Handler: updateNote.handler
+      Description: Update an existing medical note
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotesTable
+        - KMSDecryptPolicy:
+            KeyId: !Ref EncryptionKey
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /patients/{patientId}/notes/{noteId}
+            Method: PUT
+      Tags:
+        Environment: !Ref Environment
+        Application: SnoreMD
+
+  DeleteNoteFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/deleteNote.ts
+    Properties:
+      CodeUri: ..
+      Handler: deleteNote.handler
+      Description: Soft delete a medical note
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotesTable
+        - KMSDecryptPolicy:
+            KeyId: !Ref EncryptionKey
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /patients/{patientId}/notes/{noteId}
+            Method: DELETE
+      Tags:
+        Environment: !Ref Environment
+        Application: SnoreMD
+
+  PresignUploadFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/presignUpload.ts
+    Properties:
+      CodeUri: ..
+      Handler: presignUpload.handler
+      Description: Generate presigned URL for attachment upload
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref AttachmentsBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotesTable
+        - KMSDecryptPolicy:
+            KeyId: !Ref EncryptionKey
+        - Statement:
+            - Effect: Allow
+              Action:
+                - kms:GenerateDataKey
+              Resource: !GetAtt EncryptionKey.Arn
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /patients/{patientId}/notes/{noteId}/attachments/presign
+            Method: POST
+      Tags:
+        Environment: !Ref Environment
+        Application: SnoreMD
+
+  PresignDownloadFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/presignDownload.ts
+    Properties:
+      CodeUri: ..
+      Handler: presignDownload.handler
+      Description: Generate presigned URL for attachment download
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref AttachmentsBucket
+        - DynamoDBReadPolicy:
+            TableName: !Ref NotesTable
+        - KMSDecryptPolicy:
+            KeyId: !Ref EncryptionKey
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /patients/{patientId}/notes/{noteId}/attachments/{attachmentId}/download
+            Method: GET
+      Tags:
+        Environment: !Ref Environment
+        Application: SnoreMD
+
+  # Login Function - Authenticates users and returns tokens
+  LoginFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/login.ts
+    Properties:
+      CodeUri: ..
+      Handler: login.handler
+      Description: User login endpoint - authenticates and returns JWT tokens
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
+          COGNITO_CLIENT_ID: !Ref CognitoClientId
+          COGNITO_CLIENT_SECRET: !Ref CognitoClientSecret
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminInitiateAuth
+              Resource: !Ref CognitoUserPoolArn
+      Events:
+        Login:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /auth/login
+            Method: POST
+            Auth:
+              Authorizer: NONE
+      Tags:
+        Environment: !Ref Environment
+        Application: SnoreMD
+
+  # Refresh Token Function - Exchange refresh token for new access/id tokens
+  RefreshTokenFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/refreshToken.ts
+    Properties:
+      CodeUri: ..
+      Handler: refreshToken.handler
+      Description: Refresh token endpoint - exchanges refresh token for new tokens
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
+          COGNITO_CLIENT_ID: !Ref CognitoClientId
+          COGNITO_CLIENT_SECRET: !Ref CognitoClientSecret
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminInitiateAuth
+              Resource: !Ref CognitoUserPoolArn
+      Events:
+        Refresh:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /auth/refresh
+            Method: POST
+            Auth:
+              Authorizer: NONE
+      Tags:
+        Environment: !Ref Environment
+        Application: SnoreMD
+
+  # CloudWatch Alarms
+  ApiErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsProd
+    Properties:
+      AlarmName: !Sub 'SnoreMD-API-5xxErrors-${Environment}'
+      AlarmDescription: Alert when API returns 5xx errors
+      MetricName: 5XXError
+      Namespace: AWS/ApiGateway
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref HttpApi
+      TreatMissingData: notBreaching
+
+Outputs:
+  ApiEndpoint:
+    Description: HTTP API endpoint URL
+    Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Export:
+      Name: !Sub 'SnoreMD-ApiEndpoint-${Environment}'
+
+  NotesTableName:
+    Description: DynamoDB table name
+    Value: !Ref NotesTable
+    Export:
+      Name: !Sub 'SnoreMD-NotesTable-${Environment}'
+
+  AttachmentsBucketName:
+    Description: S3 bucket for attachments
+    Value: !Ref AttachmentsBucket
+    Export:
+      Name: !Sub 'SnoreMD-AttachmentsBucket-${Environment}'
+
+  EncryptionKeyArn:
+    Description: KMS key ARN for encryption
+    Value: !GetAtt EncryptionKey.Arn
+    Export:
+      Name: !Sub 'SnoreMD-EncryptionKey-${Environment}'

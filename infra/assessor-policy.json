@@ -1,0 +1,83 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ViewLambdaFunctions",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
+        "lambda:ListFunctions",
+        "lambda:GetPolicy"
+      ],
+      "Resource": "arn:aws:lambda:us-east-1:*:function:snoremd-*"
+    },
+    {
+      "Sid": "ViewDynamoDB",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:DescribeTable",
+        "dynamodb:ListTables",
+        "dynamodb:Scan",
+        "dynamodb:Query",
+        "dynamodb:GetItem"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:*:table/SnoreMDNotes-*"
+    },
+    {
+      "Sid": "ViewAPIGateway",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:GET"
+      ],
+      "Resource": [
+        "arn:aws:apigateway:us-east-1::/apis/*",
+        "arn:aws:apigateway:us-east-1::/apis/*/routes",
+        "arn:aws:apigateway:us-east-1::/apis/*/integrations"
+      ]
+    },
+    {
+      "Sid": "ViewCloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogGroups",
+        "logs:DescribeLogStreams",
+        "logs:GetLogEvents",
+        "logs:FilterLogEvents"
+      ],
+      "Resource": "arn:aws:logs:us-east-1:*:log-group:/aws/lambda/snoremd-*"
+    },
+    {
+      "Sid": "ViewS3Bucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketLocation",
+        "s3:GetBucketPolicy",
+        "s3:GetBucketAcl",
+        "s3:GetEncryptionConfiguration",
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::snoremd-attachments-*"
+    },
+    {
+      "Sid": "ViewCloudFormation",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackResources",
+        "cloudformation:GetTemplate"
+      ],
+      "Resource": "arn:aws:cloudformation:us-east-1:*:stack/snoremd-*/*"
+    },
+    {
+      "Sid": "ViewCognito",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:ListUsers"
+      ],
+      "Resource": "arn:aws:cognito-idp:us-east-1:*:userpool/*"
+    }
+  ]
+}

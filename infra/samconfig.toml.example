@@ -1,0 +1,87 @@
+# SAM deployment configuration for SnoreMD API
+# Copy this file to samconfig.toml and fill in your values
+# More information: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-config.html
+
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "snoremd-app"
+region = "ca-central-1"  # Update to your region
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.validate.parameters]
+lint = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+confirm_changeset = true
+resolve_s3 = true
+s3_prefix = "snoremd-app"
+disable_rollback = true
+# Replace placeholders with your actual values
+parameter_overrides = """
+  Environment="dev" \
+  CognitoUserPoolArn="arn:aws:cognito-idp:REGION:ACCOUNT_ID:userpool/USER_POOL_ID" \
+  CognitoUserPoolId="USER_POOL_ID" \
+  CognitoClientId="YOUR_CLIENT_ID" \
+  CognitoClientSecret="YOUR_CLIENT_SECRET"
+"""
+image_repositories = []
+
+[default.sync.parameters]
+watch = true
+
+[default.local_start_api.parameters]
+warm_containers = "EAGER"
+
+# Development environment
+[dev]
+[dev.deploy.parameters]
+stack_name = "snoremd-api-dev"
+parameter_overrides = """
+  Environment=dev \
+  CognitoUserPoolArn=arn:aws:cognito-idp:REGION:ACCOUNT_ID:userpool/USER_POOL_ID \
+  CognitoUserPoolId=USER_POOL_ID \
+  CognitoClientId=YOUR_CLIENT_ID \
+  CognitoClientSecret=YOUR_CLIENT_SECRET
+"""
+confirm_changeset = false
+disable_rollback = true
+resolve_s3 = true
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+tags = "Environment=dev Project=SnoreMD"
+
+# Staging environment
+[staging]
+[staging.deploy.parameters]
+stack_name = "snoremd-api-staging"
+parameter_overrides = """
+  Environment=staging \
+  CognitoUserPoolArn=arn:aws:cognito-idp:REGION:ACCOUNT_ID:userpool/USER_POOL_ID \
+  CognitoUserPoolId=USER_POOL_ID \
+  CognitoClientId=YOUR_CLIENT_ID \
+  CognitoClientSecret=YOUR_CLIENT_SECRET
+"""
+confirm_changeset = true
+disable_rollback = false
+tags = "Environment=staging Project=SnoreMD"
+
+# Production environment
+[prod]
+[prod.deploy.parameters]
+stack_name = "snoremd-api-prod"
+parameter_overrides = """
+  Environment=prod \
+  CognitoUserPoolArn=arn:aws:cognito-idp:REGION:ACCOUNT_ID:userpool/USER_POOL_ID \
+  CognitoUserPoolId=USER_POOL_ID \
+  CognitoClientId=YOUR_CLIENT_ID \
+  CognitoClientSecret=YOUR_CLIENT_SECRET
+"""
+confirm_changeset = true
+disable_rollback = false
+fail_on_empty_changeset = false
+tags = "Environment=prod Project=SnoreMD"
